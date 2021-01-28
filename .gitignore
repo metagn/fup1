@@ -1,0 +1,7 @@
+nimcache/
+*.dll
+*.exe
+win32/
+win64/
+.vscode/
+*.bat
