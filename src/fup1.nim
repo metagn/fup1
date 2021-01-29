@@ -16,9 +16,13 @@ sdl2.init(INIT_VIDEO or INIT_TIMER or INIT_EVENTS or INIT_AUDIO)
 setHint("SDL_RENDER_SCALE_QUALITY", "2")
   .unwrap("couldn't set SDL render scale quality")
 
+const
+  ReferenceWidth = 960
+  ReferenceHeight = 540
+
 let window = createWindow(
   "BrokenAce's Time Machine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-  600, 800, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
+  ReferenceWidth, ReferenceHeight, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
   .unwrap("couldn't create window")
 let renderer = window.createRenderer(-1,
   Renderer_Accelerated or Renderer_PresentVsync)
@@ -89,19 +93,19 @@ var state: GameObj
 discard openAudio(0, 0, 2, 4096)
 switch(state, gsInitial)
 
-import times, os
-var lastFrameTime = cpuTime()
-while state.kind != gsDone:
+import std/[monotimes, os]
+var lastFrameTime: MonoTime
+while (lastFrameTime = getMonoTime(); state.kind != gsDone):
   listen(state)
-  let interval = cpuTime() - lastFrameTime
-  let sleepTime = int((1 / 120 - interval.float) * 1000)
+  const fps = 120
+  const nanowait = 1_000_000_000 div fps
+  let sleepTime = int((nanowait - getMonoTime().ticks + lastFrameTime.ticks) div 1_000_000)
   if sleepTime >= 0: sleep(sleepTime)
   tick(state)
   drawColor(0, 0, 0)
   renderer.clear()
   render(state)
   renderer.present()
-  lastFrameTime = cpuTime()
 
 closeAudio()
 sdl2.quit()
