@@ -47,6 +47,7 @@ state Tetris:
   proc coord(x: Column, y: Row): Coord {.inline.} = Coord(y * Columns + x)
   proc column(c: Coord): Column {.inline.} = c.int mod Columns
   proc row(c: Coord): Row {.inline.} = c.int div Columns
+  proc `$`(c: Coord): string {.used.} = $(c.column, c.row)
   proc rot(x, y: int, q: Rotation): (int, int) =
     case q
     of 0: (x, y)
@@ -77,20 +78,45 @@ state Tetris:
   var
     board: array[Coord, PieceKind] # array of rows, top to bottom
 
+    nextPieces: array[4, Piece]
+
     piece: Piece
 
     pieceDropTicking = true
     pieceDropTick = 0
     pieceDropTime = 120
+    pieceDropRetry = 0
+    pieceDropRetries = 0
 
-  proc spawnPiece(state: Tetris) {.member.} =
-    let nextKind = rand(tetI..tetT)
-    piece = Piece(pos: coord(Columns div 2, if nextKind in {tetJ, tetL}: VisibleStart + 1 else: VisibleStart), rot: 0, kind: nextKind)
+    holdPiece: Piece
+    justHeld = false
+  
+  proc randomNextPiece(): Piece =
+    const minDims = (proc: array[PieceKind, (int, int)] =
+      for pk, dim in result.mpairs:
+        for jj in pieceExtensions[pk]:
+          if jj[0] < dim[0]: dim[0] = jj[0]
+          if jj[1] < dim[1]: dim[1] = jj[1])()
+    result.kind = rand(tetI..tetT)
+    result.pos = coord(-minDims[result.kind][0], -minDims[result.kind][1])
+
+  proc nextPiece(state: Tetris): Piece {.member.} =
+    result = nextPieces[0]
+    nextPieces[0..^2] = nextPieces[1..^1]
+    nextPieces[^1] = randomNextPiece()
+
+  proc spawnPiece(state: Tetris, initial = state.nextPiece()) {.member.} =
+    piece = initial
+    if piece.kind == tetNone:
+      piece.kind = rand(tetI..tetT)
+    piece.pos = coord(Columns div 2, if piece.kind in {tetJ, tetL}: VisibleStart + 1 else: VisibleStart)
     while board.overlaps(piece):
       piece.pos = Coord(piece.pos.int - Columns)
 
   init:
     randomize()
+    for np in nextPieces.mitems:
+      np = randomNextPiece()
     state.tetris.spawnPiece()
     setMusic(currentMusic, "assets/music.ogg")
     loopMusic(currentMusic)
@@ -101,6 +127,12 @@ state Tetris:
     result = false
     for c in piece.coveredCoords:
       if board[c] != tetNone:
+        return true
+  
+  proc overlapsOrOOB(board: array[Coord, PieceKind], piece: Piece): bool =
+    result = false
+    for c in piece.coveredCoords(result):
+      if result or board[c] != tetNone:
         return true
   
   proc rotate(state: Tetris, forward: bool) {.member.} =
@@ -147,9 +179,14 @@ state Tetris:
       newPiece.pos = Coord(newPiece.pos.int + Columns)
       spawned = board.overlaps(newPiece)
     if spawned:
-      for c in piece.coveredCoords:
-        board[c] = piece.kind
-      state.spawnPiece()
+      if pieceDropRetry < pieceDropRetries:
+        inc pieceDropRetry
+      else:
+        pieceDropRetry = 0
+        justHeld = false
+        for c in piece.coveredCoords:
+          board[c] = piece.kind
+        state.spawnPiece()
     else:
       piece = newPiece
   
@@ -185,24 +222,111 @@ state Tetris:
   render:
     const TilePix = ReferenceHeight div VisibleRows
     const ColumnStart = (ReferenceWidth - TilePix * Columns) div 2
-    let relativeTilePix = cint round TilePix * windowWidth / ReferenceWidth
+    const ColumnEnd = ReferenceWidth - ColumnStart
+    const Div23 = ColumnStart / 23
+    template scaleX(f: SomeFloat): SomeFloat = f * windowWidth.float / ReferenceWidth
+    template scaleY(f: SomeFloat): SomeFloat = f * windowHeight.float / ReferenceHeight
+    template scaleX(f: SomeInteger): SomeInteger = f * windowWidth div ReferenceWidth
+    template scaleY(f: SomeInteger): SomeInteger = f * windowHeight div ReferenceHeight
+    const guideColor = color(80, 80, 80, 255)
+    let scaledTileWidth = cint ceil scaleX TilePix.float
+    let scaledTileHeight = cint ceil scaleY TilePix.float
+
+    # next pieces:
+    drawColor guideColor
+    const NextPieceStartX = ColumnEnd + 4 * 23
+    const NextPieceStartY = 3 * Div23
+    renderer.drawRect(rect(
+      cint scaleX NextPieceStartX,
+      cint scaleY NextPieceStartY,
+      cint ceil scaleX 5 * Div23,
+      cint ceil scaleY 17 * Div23))
+    for i, p in nextPieces:
+      drawColor pieceColors[p.kind]
+      var maxX, maxY = 0
+      for c in coveredCoords(p):
+        if c.column > maxX: maxX = c.column
+        if c.row > maxY: maxY = c.row
+      const PieceArea = 3 * Div23
+      const PieceDist = Div23
+      let
+        width = maxX + 1
+        height = maxY + 1
+        unit = PieceArea / max(width, height).float
+        tileWidth = cint ceil scaleX unit
+        tileHeight = cint ceil scaleY unit
+        tileXStart = NextPieceStartX + PieceDist + (PieceArea - width.float * unit) / 2
+        tileYStart = NextPieceStartY + PieceDist + i.float * (PieceArea + PieceDist) + (PieceArea - height.float * unit) / 2
+      for c in coveredCoords(p):
+        let x = cint scaleX c.column.float * unit + tileXStart
+        let y = cint scaleY c.row.float * unit + tileYStart
+        fillRect x, y, tileWidth, tileHeight
+
+
+    # hold pieces:
+    drawColor guideColor
+    renderer.drawRect(rect(
+      cint scaleX 13 * Div23,
+      cint scaleY 3 * Div23,
+      cint ceil scaleX 5 * Div23,
+      cint ceil scaleY 5 * Div23))
+    if holdPiece.kind != tetNone:
+      const HoldPieceStart = 14 * Div23
+      const unavailableHoldPieceColor = color(60, 60, 60, 255)
+      drawColor if justHeld: unavailableHoldPieceColor else: pieceColors[holdPiece.kind]
+      var maxX, maxY = 0
+      for c in coveredCoords(holdPiece):
+        if c.column > maxX: maxX = c.column
+        if c.row > maxY: maxY = c.row
+      const HoldPieceArea = 3 * Div23
+      let
+        width = maxX + 1
+        height = maxY + 1
+        unit = HoldPieceArea / max(width, height).float
+        tileWidth = cint ceil scaleX unit
+        tileHeight = cint ceil scaleY unit
+        tileXStart = HoldPieceStart + (HoldPieceArea - width.float * unit) / 2
+        tileYStart = 4 * Div23 + (HoldPieceArea - height.float * unit) / 2
+      for c in coveredCoords(holdPiece):
+        let x = cint scaleX c.column.float * unit + tileXStart
+        let y = cint scaleY c.row.float * unit + tileYStart
+        fillRect x, y, tileWidth, tileHeight
+    
+    # board:
     for rowI in VisibleStart..<Rows:
       for colI in 0..<Columns:
         let p = board[coord(colI, rowI)]
-        let screenX = cint (colI * TilePix + ColumnStart) * windowWidth / ReferenceWidth
-        let screenY = cint ((rowI - VisibleStart) * TilePix) * windowHeight / ReferenceHeight
+        let x = cint scaleX colI * TilePix + ColumnStart
+        let y = cint scaleY (rowI - VisibleStart) * TilePix
         if p != tetNone:
           drawColor pieceColors[p]
-          fillRect screenX, screenY, relativeTilePix, relativeTilePix
-        drawColor 80, 80, 80
-        renderer.drawRect((var r = rect(screenX, screenY, relativeTilePix, relativeTilePix); addr r))
+          fillRect x, y, scaledTileWidth, scaledTileHeight
+        drawColor guideColor
+        renderer.drawRect(rect(x, y, scaledTileWidth, scaledTileHeight))
+    
+    # shadow piece:
+    var shadowPiece = piece
+    while true:
+      let oldPos = shadowPiece.pos
+      let newRow = oldPos.row + 1
+      if newRow notin Row or (shadowPiece.pos = coord(oldPos.column, newRow); board.overlapsOrOOB(shadowPiece)):
+        shadowPiece.pos = oldPos
+        break
+    const shadowColor = color(200, 200, 200, 255)
+    drawColor shadowColor
+    for c in coveredCoords(shadowPiece):
+      if c.row >= VisibleStart:
+        let x = cint scaleX c.column * TilePix + ColumnStart
+        let y = cint scaleY (c.row - VisibleStart) * TilePix
+        fillRect x, y, scaledTileWidth, scaledTileHeight
+    
+    # real piece:
     drawColor pieceColors[piece.kind]
     for c in coveredCoords(piece):
       if c.row >= VisibleStart:
-        let screenX = cint (c.column * TilePix + ColumnStart) * windowWidth / ReferenceWidth
-        let screenY = cint ((c.row - VisibleStart) * TilePix) * windowHeight / ReferenceHeight
-        drawColor pieceColors[piece.kind]
-        fillRect screenX, screenY, relativeTilePix, relativeTilePix
+        let x = cint scaleX c.column * TilePix + ColumnStart
+        let y = cint scaleY (c.row - VisibleStart) * TilePix
+        fillRect x, y, scaledTileWidth, scaledTileHeight
   
   key:
     case event.keysym.scancode
@@ -210,8 +334,22 @@ state Tetris:
       state.tetris.rotate(forward = true)
     of SDL_SCANCODE_Z:
       state.tetris.rotate(forward = false)
+    of SDL_SCANCODE_C:
+      if not justHeld:
+        justHeld = true
+        let oldHoldPiece = holdPiece
+        holdPiece = piece
+        var
+          minX = holdPiece.pos.column
+          minY = holdPiece.pos.row
+        for c in coveredCoords(holdPiece):
+          if c.column < minX: minX = c.column
+          if c.row < minY: minY = c.row
+        holdPiece.pos = coord(holdPiece.pos.column - minX, holdPiece.pos.row - minY)
+        state.tetris.spawnPiece(oldHoldPiece)
     of SDL_SCANCODE_DOWN:
       pieceDropTime = 10
+      pieceDropRetries = 3
     of SDL_SCANCODE_UP:
       var spawned: bool
       while not spawned: state.tetris.drop(spawned)
@@ -246,4 +384,5 @@ state Tetris:
     case event.keysym.scancode
     of SDL_SCANCODE_DOWN:
       pieceDropTime = 120
+      pieceDropRetries = 0
     else: discard
