@@ -21,7 +21,7 @@ const
   ReferenceHeight = 540
 
 let window = createWindow(
-  "BrokenAce's Time Machine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+  "The Tetry Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
   ReferenceWidth, ReferenceHeight, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
   .unwrap("couldn't create window")
 let renderer = window.createRenderer(-1,
@@ -29,6 +29,7 @@ let renderer = window.createRenderer(-1,
   .unwrap("couldn't create renderer")
 
 var currentMusic {.used.}: MusicPtr
+var musicVolume {.used.}: cint = 128
 
 behavior:
   template render(state: Game) {.dirty.} =
@@ -90,7 +91,7 @@ endScheme()
 
 var state: GameObj
 
-discard openAudio(0, 0, 2, 4096)
+discard openAudio(44100, 0, 2, 4096)
 switch(state, gsInitial)
 
 import std/[monotimes, os]

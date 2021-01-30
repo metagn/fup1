@@ -86,7 +86,7 @@ state Tetris:
     pieceDropTick = 0
     pieceDropTime = 120
     pieceDropRetry = 0
-    pieceDropRetries = 0
+    pieceDropRetries = 1
 
     holdPiece: Piece
     justHeld = false
@@ -112,6 +112,7 @@ state Tetris:
     piece.pos = coord(Columns div 2, if piece.kind in {tetJ, tetL}: VisibleStart + 1 else: VisibleStart)
     while board.overlaps(piece):
       piece.pos = Coord(piece.pos.int - Columns)
+    pieceDropTick = 0
 
   init:
     randomize()
@@ -262,7 +263,6 @@ state Tetris:
         let y = cint scaleY c.row.float * unit + tileYStart
         fillRect x, y, tileWidth, tileHeight
 
-
     # hold pieces:
     drawColor guideColor
     renderer.drawRect(rect(
@@ -351,9 +351,16 @@ state Tetris:
       pieceDropTime = 10
       pieceDropRetries = 3
     of SDL_SCANCODE_UP:
+      pieceDropRetry = pieceDropRetries
       var spawned: bool
       while not spawned: state.tetris.drop(spawned)
       pieceDropTick = 0
+    of SDL_SCANCODE_I:
+      musicVolume = max(0, musicVolume - 16)
+      discard volumeMusic(musicVolume)
+    of SDL_SCANCODE_O:
+      musicVolume = min(128, musicVolume + 16)
+      discard volumeMusic(musicVolume)
     of SDL_SCANCODE_ESCAPE:
       state.switch(gsInitial)
     else: discard
@@ -384,5 +391,5 @@ state Tetris:
     case event.keysym.scancode
     of SDL_SCANCODE_DOWN:
       pieceDropTime = 120
-      pieceDropRetries = 0
+      pieceDropRetries = 1
     else: discard
