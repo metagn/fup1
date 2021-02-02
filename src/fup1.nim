@@ -89,23 +89,23 @@ addState Done
 
 endScheme()
 
-var state: GameObj
+var game = GameObj(kind: gsInitial)
+init(game)
 
 discard openAudio(44100, 0, 2, 4096)
-switch(state, gsInitial)
 
 import std/[monotimes, os]
 var lastFrameTime: MonoTime
-while (lastFrameTime = getMonoTime(); state.kind != gsDone):
-  listen(state)
+while (lastFrameTime = getMonoTime(); game.kind != gsDone):
+  listen(game)
   const fps = 120
   const nanowait = 1_000_000_000 div fps
   let sleepTime = int((nanowait - getMonoTime().ticks + lastFrameTime.ticks) div 1_000_000)
   if sleepTime >= 0: sleep(sleepTime)
-  tick(state)
+  tick(game)
   drawColor(0, 0, 0)
   renderer.clear()
-  render(state)
+  render(game)
   renderer.present()
 
 closeAudio()

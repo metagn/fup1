@@ -225,10 +225,24 @@ state Tetris:
     const ColumnStart = (ReferenceWidth - TilePix * Columns) div 2
     const ColumnEnd = ReferenceWidth - ColumnStart
     const Div23 = ColumnStart / 23
-    template scaleX(f: SomeFloat): SomeFloat = f * windowWidth.float / ReferenceWidth
-    template scaleY(f: SomeFloat): SomeFloat = f * windowHeight.float / ReferenceHeight
-    template scaleX(f: SomeInteger): SomeInteger = f * windowWidth div ReferenceWidth
-    template scaleY(f: SomeInteger): SomeInteger = f * windowHeight div ReferenceHeight
+    let (scaledWindowWidth, scaledWindowHeight) = block:
+      let a = windowWidth / ReferenceWidth
+      let b = windowHeight / ReferenceHeight
+      if a != b:
+        let newRatio = min(a, b)
+        (newRatio * ReferenceWidth, newRatio * ReferenceHeight)
+      else:
+        (windowWidth.float, windowHeight.float)
+    let startX = (windowWidth.float - scaledWindowWidth) / 2
+    let startY = (windowHeight.float - scaledWindowHeight) / 2
+    template scaleX[T: SomeFloat](f: T): T = f * scaledWindowWidth / ReferenceWidth
+    template scaleY[T: SomeFloat](f: T): T = f * scaledWindowHeight / ReferenceHeight
+    template scaleX[T: SomeInteger](f: T): T = T(f.float * scaledWindowWidth / ReferenceWidth)
+    template scaleY[T: SomeInteger](f: T): T = T(f.float * scaledWindowHeight / ReferenceHeight)
+    template translateX[T: SomeFloat](f: T): T = startX + scaleX(f)
+    template translateY[T: SomeFloat](f: T): T = startY + scaleX(f)
+    template translateX[T: SomeInteger](f: T): T = T(startX) + scaleY(f)
+    template translateY[T: SomeInteger](f: T): T = T(startY) + scaleY(f)
     const guideColor = color(80, 80, 80, 255)
     let scaledTileWidth = cint ceil scaleX TilePix.float
     let scaledTileHeight = cint ceil scaleY TilePix.float
@@ -238,8 +252,8 @@ state Tetris:
     const NextPieceStartX = ColumnEnd + 4 * 23
     const NextPieceStartY = 3 * Div23
     renderer.drawRect(rect(
-      cint scaleX NextPieceStartX,
-      cint scaleY NextPieceStartY,
+      cint translateX NextPieceStartX,
+      cint translateY NextPieceStartY,
       cint ceil scaleX 5 * Div23,
       cint ceil scaleY 17 * Div23))
     for i, p in nextPieces:
@@ -259,15 +273,15 @@ state Tetris:
         tileXStart = NextPieceStartX + PieceDist + (PieceArea - width.float * unit) / 2
         tileYStart = NextPieceStartY + PieceDist + i.float * (PieceArea + PieceDist) + (PieceArea - height.float * unit) / 2
       for c in coveredCoords(p):
-        let x = cint scaleX c.column.float * unit + tileXStart
-        let y = cint scaleY c.row.float * unit + tileYStart
+        let x = cint translateX c.column.float * unit + tileXStart
+        let y = cint translateY c.row.float * unit + tileYStart
         fillRect x, y, tileWidth, tileHeight
 
     # hold pieces:
     drawColor guideColor
     renderer.drawRect(rect(
-      cint scaleX 13 * Div23,
-      cint scaleY 3 * Div23,
+      cint translateX 13 * Div23,
+      cint translateY 3 * Div23,
       cint ceil scaleX 5 * Div23,
       cint ceil scaleY 5 * Div23))
     if holdPiece.kind != tetNone:
@@ -288,16 +302,16 @@ state Tetris:
         tileXStart = HoldPieceStart + (HoldPieceArea - width.float * unit) / 2
         tileYStart = 4 * Div23 + (HoldPieceArea - height.float * unit) / 2
       for c in coveredCoords(holdPiece):
-        let x = cint scaleX c.column.float * unit + tileXStart
-        let y = cint scaleY c.row.float * unit + tileYStart
+        let x = cint translateX c.column.float * unit + tileXStart
+        let y = cint translateY c.row.float * unit + tileYStart
         fillRect x, y, tileWidth, tileHeight
     
     # board:
     for rowI in VisibleStart..<Rows:
       for colI in 0..<Columns:
         let p = board[coord(colI, rowI)]
-        let x = cint scaleX colI * TilePix + ColumnStart
-        let y = cint scaleY (rowI - VisibleStart) * TilePix
+        let x = cint translateX colI * TilePix + ColumnStart
+        let y = cint translateY (rowI - VisibleStart) * TilePix
         if p != tetNone:
           drawColor pieceColors[p]
           fillRect x, y, scaledTileWidth, scaledTileHeight
@@ -316,16 +330,16 @@ state Tetris:
     drawColor shadowColor
     for c in coveredCoords(shadowPiece):
       if c.row >= VisibleStart:
-        let x = cint scaleX c.column * TilePix + ColumnStart
-        let y = cint scaleY (c.row - VisibleStart) * TilePix
+        let x = cint translateX c.column * TilePix + ColumnStart
+        let y = cint translateY (c.row - VisibleStart) * TilePix
         fillRect x, y, scaledTileWidth, scaledTileHeight
     
     # real piece:
     drawColor pieceColors[piece.kind]
     for c in coveredCoords(piece):
       if c.row >= VisibleStart:
-        let x = cint scaleX c.column * TilePix + ColumnStart
-        let y = cint scaleY (c.row - VisibleStart) * TilePix
+        let x = cint translateX c.column * TilePix + ColumnStart
+        let y = cint translateY (c.row - VisibleStart) * TilePix
         fillRect x, y, scaledTileWidth, scaledTileHeight
   
   key:
@@ -393,3 +407,12 @@ state Tetris:
       pieceDropTime = 120
       pieceDropRetries = 1
     else: discard
+  
+  windowResize:
+    if false:
+      let (width, height) = window.getSize
+      let a = width / ReferenceWidth
+      let b = height / ReferenceHeight
+      if a != b:
+        let min = min(a, b)
+        window.setSize cint round min * ReferenceWidth, cint round min * ReferenceHeight
