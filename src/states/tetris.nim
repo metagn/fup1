@@ -148,22 +148,28 @@ state Tetris:
     newPiece.rot = newRot
     var outOfBounds: bool
     for _ in newPiece.coveredCoords(outOfBounds): discard
-    if outOfBounds:
+    var i = 1
+    while outOfBounds:
       outOfBounds = false
       # check left first
       let (col0, row0) = (newPiece.pos.column, newPiece.pos.row)
-      if col0 - 1 in Column:
-        newPiece.pos = coord(col0 - 1, row0)
+      var oneInside = false
+      if col0 - i in Column:
+        oneInside = true
+        newPiece.pos = coord(col0 - i, row0)
         for _ in newPiece.coveredCoords(outOfBounds): discard
       else: outOfBounds = true
       if outOfBounds:
         outOfBounds = false
         # check right second
-        if col0 + 1 in Column:
-          newPiece.pos = coord(col0 + 1, row0)
+        if col0 + i in Column:
+          oneInside = true
+          newPiece.pos = coord(col0 + i, row0)
           for _ in newPiece.coveredCoords(outOfBounds): discard
         else: outOfBounds = true
-        if outOfBounds: return
+      if oneInside: inc i
+      else: break
+    if outOfBounds: return
     while board.overlaps(newPiece):
       # jump up
       newPiece.pos = Coord(newPiece.pos.int - Columns)
