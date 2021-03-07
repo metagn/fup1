@@ -85,25 +85,36 @@ state Tetris:
     pieceDropTicking = true
     pieceDropTick = 0
     pieceDropTime = 120
+    pieceDropTickMultiplier = 1
     pieceDropRetry = 0
     pieceDropRetries = 1
 
     holdPiece: Piece
     justHeld = false
+    randBuffer: array[len(tetI..tetT), PieceKind]
+    randBufferPos = len(tetI..tetT)
   
-  proc randomNextPiece(): Piece =
+  proc randPieceKind(state: Tetris): PieceKind {.member.} =
+    if randBufferPos == len(randBuffer):
+      randBufferPos = 0
+      randBuffer = [tetI, tetJ, tetL, tetO, tetS, tetZ, tetT]
+      shuffle randBuffer
+    result = randBuffer[randBufferPos]
+    inc randBufferPos
+
+  proc initPiece(kind: PieceKind): Piece =
     const minDims = (proc: array[PieceKind, (int, int)] =
       for pk, dim in result.mpairs:
         for jj in pieceExtensions[pk]:
           if jj[0] < dim[0]: dim[0] = jj[0]
           if jj[1] < dim[1]: dim[1] = jj[1])()
-    result.kind = rand(tetI..tetT)
-    result.pos = coord(-minDims[result.kind][0], -minDims[result.kind][1])
+    result.kind = kind
+    result.pos = coord(-minDims[kind][0], -minDims[kind][1])
 
   proc nextPiece(state: Tetris): Piece {.member.} =
     result = nextPieces[0]
     nextPieces[0..^2] = nextPieces[1..^1]
-    nextPieces[^1] = randomNextPiece()
+    nextPieces[^1] = initPiece(state.randPieceKind)
 
   proc spawnPiece(state: Tetris, initial = state.nextPiece()) {.member.} =
     piece = initial
@@ -117,7 +128,7 @@ state Tetris:
   init:
     randomize()
     for np in nextPieces.mitems:
-      np = randomNextPiece()
+      np = initPiece(state.tetris.randPieceKind)
     state.tetris.spawnPiece()
     setMusic(currentMusic, "assets/music.ogg")
     loopMusic(currentMusic)
@@ -204,7 +215,7 @@ state Tetris:
   tick:
     if pieceDropTicking:
       inc pieceDropTick
-      if pieceDropTick >= adjustFps pieceDropTime:
+      if pieceDropTick * pieceDropTickMultiplier >= adjustFps(pieceDropTime):
         state.tetris.drop()
         pieceDropTick = 0
       for r in 0..<Rows:
@@ -379,6 +390,10 @@ state Tetris:
       var spawned: bool
       while not spawned: state.tetris.drop(spawned)
       pieceDropTick = 0
+    of (SDL_SCANCODE_D, "d"):
+      inc pieceDropTickMultiplier
+    of (SDL_SCANCODE_S, "s"):
+      pieceDropTickMultiplier = max(0, pieceDropTickMultiplier - 1)
     of (SDL_SCANCODE_I, "i"), (_, "ı"):
       setVolume(max(0, musicVolume - 16))
     of (SDL_SCANCODE_O, "o"):
