@@ -204,7 +204,7 @@ state Tetris:
   tick:
     if pieceDropTicking:
       inc pieceDropTick
-      if pieceDropTick >= pieceDropTime:
+      if pieceDropTick >= adjustFps pieceDropTime:
         state.tetris.drop()
         pieceDropTick = 0
       for r in 0..<Rows:
@@ -257,11 +257,11 @@ state Tetris:
     drawColor guideColor
     const NextPieceStartX = ColumnEnd + 4 * 23
     const NextPieceStartY = 3 * Div23
-    renderer.drawRect(rect(
+    drawRect(
       cint translateX NextPieceStartX,
       cint translateY NextPieceStartY,
       cint ceil scaleX 5 * Div23,
-      cint ceil scaleY 17 * Div23))
+      cint ceil scaleY 17 * Div23)
     for i, p in nextPieces:
       drawColor pieceColors[p.kind]
       var maxX, maxY = 0
@@ -285,11 +285,11 @@ state Tetris:
 
     # hold pieces:
     drawColor guideColor
-    renderer.drawRect(rect(
+    drawRect(
       cint translateX 13 * Div23,
       cint translateY 3 * Div23,
       cint ceil scaleX 5 * Div23,
-      cint ceil scaleY 5 * Div23))
+      cint ceil scaleY 5 * Div23)
     if holdPiece.kind != tetNone:
       const HoldPieceStart = 14 * Div23
       const unavailableHoldPieceColor = color(60, 60, 60, 255)
@@ -322,7 +322,7 @@ state Tetris:
           drawColor pieceColors[p]
           fillRect x, y, scaledTileWidth, scaledTileHeight
         drawColor guideColor
-        renderer.drawRect(rect(x, y, scaledTileWidth, scaledTileHeight))
+        drawRect(x, y, scaledTileWidth, scaledTileHeight)
     
     # shadow piece:
     var shadowPiece = piece
@@ -349,15 +349,19 @@ state Tetris:
         fillRect x, y, scaledTileWidth, scaledTileHeight
   
   key:
-    case event.keysym.scancode
-    of SDL_SCANCODE_X:
+    caseCOrJs (event.keysym.scancode, $event.key):
+    of (SDL_SCANCODE_X, "x"):
       state.tetris.rotate(forward = true)
-    of SDL_SCANCODE_Z:
+    of (SDL_SCANCODE_Z, "z"):
       state.tetris.rotate(forward = false)
-    of SDL_SCANCODE_C:
+    of (SDL_SCANCODE_C, "c"):
       if not justHeld:
         justHeld = true
-        let oldHoldPiece = holdPiece
+        let oldHoldPiece =
+          if holdPiece.kind != tetNone:
+            holdPiece
+          else:
+            state.tetris.nextPiece()
         holdPiece = piece
         var
           minX = holdPiece.pos.column
@@ -367,27 +371,25 @@ state Tetris:
           if c.row < minY: minY = c.row
         holdPiece.pos = coord(holdPiece.pos.column - minX, holdPiece.pos.row - minY)
         state.tetris.spawnPiece(oldHoldPiece)
-    of SDL_SCANCODE_DOWN:
+    of (SDL_SCANCODE_DOWN, "ArrowDown"), (_, "Down"):
       pieceDropTime = 10
       pieceDropRetries = 3
-    of SDL_SCANCODE_UP:
+    of (SDL_SCANCODE_UP, "ArrowUp"), (_, "Up"):
       pieceDropRetry = pieceDropRetries
       var spawned: bool
       while not spawned: state.tetris.drop(spawned)
       pieceDropTick = 0
-    of SDL_SCANCODE_I:
-      musicVolume = max(0, musicVolume - 16)
-      discard volumeMusic(musicVolume)
-    of SDL_SCANCODE_O:
-      musicVolume = min(128, musicVolume + 16)
-      discard volumeMusic(musicVolume)
-    of SDL_SCANCODE_ESCAPE:
+    of (SDL_SCANCODE_I, "i"), (_, "ı"):
+      setVolume(max(0, musicVolume - 16))
+    of (SDL_SCANCODE_O, "o"):
+      setVolume(min(128, musicVolume + 16))
+    of (SDL_SCANCODE_ESCAPE, "Escape"):
       state.switch(gsInitial)
     else: discard
   
   keyRepeat:
-    case event.keysym.scancode
-    of SDL_SCANCODE_LEFT:
+    caseCOrJs (event.keysym.scancode, $event.key):
+    of (SDL_SCANCODE_LEFT, "ArrowLeft"), (_, "Left"):
       var minCol = high Column
       for c in piece.coveredCoords:
         if c.column < minCol: minCol = c.column
@@ -396,7 +398,7 @@ state Tetris:
         newPiece.pos = Coord(newPiece.pos.int - 1)
         if not board.overlaps(newPiece):
           piece = newPiece
-    of SDL_SCANCODE_RIGHT:
+    of (SDL_SCANCODE_RIGHT, "ArrowRight"), (_, "Right"):
       var maxCol = 0
       for c in piece.coveredCoords:
         if c.column > maxCol: maxCol = c.column
@@ -408,14 +410,14 @@ state Tetris:
     else: discard
   
   keyReleased:
-    case event.keysym.scancode
-    of SDL_SCANCODE_DOWN:
+    caseCOrJs (event.keysym.scancode, $event.key):
+    of (SDL_SCANCODE_DOWN, "ArrowDown"), (_, "Down"):
       pieceDropTime = 120
       pieceDropRetries = 1
     else: discard
   
-  windowResize:
-    if false:
+  when false:
+    windowResize:
       let (width, height) = window.getSize
       let a = width / ReferenceWidth
       let b = height / ReferenceHeight

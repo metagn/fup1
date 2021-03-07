@@ -4,7 +4,7 @@ if defined(compile32bit):
   --passL:"-m32"
   switch("gcc.path", getEnv("MINGW_32"))
   --outdir:win32
-else:
+elif defined(windows):
   --outdir:win64
 if defined(release):
   --app:gui
