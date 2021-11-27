@@ -6,3 +6,4 @@ win64/
 #browser/
 .vscode/
 *.bat
+res/
