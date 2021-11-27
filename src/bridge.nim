@@ -3,7 +3,7 @@ import macros
 macro caseCOrJs*(val: untyped, branches: varargs[untyped]): untyped =
   proc transform(n: NimNode): NimNode =
     result = n
-    if result.kind in {nnkPar, nnkBracket, nnkCurly}:
+    if result.kind in {nnkPar, nnkBracket, nnkCurly, nnkTupleConstr}:
       result = result[int defined(js)]
   result = newNimNode(nnkCaseStmt)
   result.add(transform val)
