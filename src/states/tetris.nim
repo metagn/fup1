@@ -127,7 +127,7 @@ proc nextPiece(state: Tetris): Piece =
   state.nextPieces[0..^2] = state.nextPieces[1..^1]
   state.nextPieces[^1] = initPiece(state.randPieceKind)
 
-proc spawnPiece(state: Tetris, initial = nextPiece(state, )) =
+proc spawnPiece(state: Tetris, initial = nextPiece(state)) =
   state.piece = initial
   if state.piece.kind == tetNone:
     state.piece.kind = rand(tetI..tetT)
@@ -150,7 +150,7 @@ proc init*(state: var Tetris, global: Global) =
   randomize()
   for np in state.nextPieces.mitems:
     np = initPiece(state.randPieceKind)
-  spawnPiece(state, )
+  spawnPiece(state)
   setMusic(global.currentMusic, "assets/music.ogg")
   loopMusic(global.currentMusic)
 
@@ -214,7 +214,7 @@ proc drop(state: Tetris, spawned: var bool) =
       state.justHeld = false
       for c in state.piece.coveredCoords:
         state.board[c] = state.piece.kind
-      spawnPiece(state, )
+      spawnPiece(state)
   else:
     state.piece = newPiece
 
@@ -226,7 +226,7 @@ template tick*(state: Tetris, global: Global) =
   if state.pieceDropTicking:
     inc state.pieceDropTick
     if state.pieceDropTick * state.pieceDropTickMultiplier >= adjustFps(state.pieceDropTime):
-      drop(state, )
+      drop(state)
       state.pieceDropTick = 0
     for r in 0..<Rows:
       var anyEmpty = false

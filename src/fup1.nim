@@ -104,7 +104,7 @@ when true: # behaviors again
   proc init(game: Game) =
     init(game, game.state, game.global)
 
-  proc finish(game: Game) =
+  proc finish*(game: Game) =
     finish(game, game.state, game.global)
 
   proc tick(game: Game) =
