@@ -1,4 +1,7 @@
-import dom, strutils
+import dom, jscanvas
+export dom, jscanvas
+
+import strutils
 
 type
   Audio* {.importc: "Audio".} = ref object

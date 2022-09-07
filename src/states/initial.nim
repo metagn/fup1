@@ -1,15 +1,22 @@
-state Initial:
-  let background = loadTexture("assets/mainmenu.png")
+import common
 
-  finish: background.destroy()
-  
-  render:
-    draw(background, 0, 0, windowWidth, windowHeight)
+type Initial* = ref object
+  background*: TexturePtr
 
-  key:
-    if not modsHeldDown:
-      caseCOrJs (event.keysym.scancode, $event.key):
-      of (SDL_SCANCODE_ESCAPE, "Escape"):
-        when not defined(js): state.switch(gsDone)
-      else:
-        state.switch(gsTetris)
+template init*(state: var Initial, global: Global) =
+  state = Initial()
+  state.background = loadTexture("assets/mainmenu.png")
+
+template finish*(state: Initial, global: Global) =
+  state.background.destroy()
+
+template render*(state: Initial, global: Global, windowWidth, windowHeight: cint) =
+  state.background.draw(0, 0, windowWidth, windowHeight)
+
+template key*(state: Initial, global: Global, event: KeyboardEventPtr) =
+  if not modsHeldDown():
+    caseCOrJs (event.keysym.scancode, $event.key):
+    of (SDL_SCANCODE_ESCAPE, "Escape"):
+      when not defined(js): game.switch(gsDone)
+    else:
+      game.switch(gsTetris)
