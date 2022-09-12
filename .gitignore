@@ -3,7 +3,5 @@ nimcache/
 *.exe
 win32/
 win64/
-#browser/
 .vscode/
-*.bat
-res/
+assets/music.ogg

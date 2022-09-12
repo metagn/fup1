@@ -47,6 +47,7 @@ when true: # behaviors
     of gsInitial: tick(state.initial, global)
     of gsTetris: tick(state.tetris, global)
     of gsDone: tick(state.done, global)
+
   proc render(game: Game, state: State, global: Global, windowWidth, windowHeight: cint) =
     case state.kind
     of gsNone: render(state.none, global, windowWidth, windowHeight)
@@ -75,36 +76,11 @@ when true: # behaviors
     of gsTetris: keyReleased(state.tetris, global, event)
     of gsDone: keyReleased(state.done, global, event)
 
-proc switch(game: Game, k: StateKind) =
-  finish(game.state, game.global)
-  game.state = State(kind: k)
-  init(game.state, game.global)
-
-proc newGame(): Game =
-  result = Game()
-  result.global = newGlobal()
-  when defined(js):
-    result.global.canvas = CanvasElement getElementById("fup1")
-    result.global.context = result.global.canvas.getContext2d()
-  else:
-    sdl2.init(INIT_VIDEO or INIT_TIMER or INIT_EVENTS or INIT_AUDIO)
-      .unwrap("couldn't initialize SDL")
-    setHint("SDL_RENDER_SCALE_QUALITY", "2")
-      .unwrap("couldn't set SDL render scale quality")
-
-    result.global.window = createWindow(
-      "The Tetry Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      ReferenceWidth, ReferenceHeight, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
-      .unwrap("couldn't create window")
-    result.global.renderer = result.global.window.createRenderer(-1,
-      Renderer_Accelerated or Renderer_PresentVsync)
-      .unwrap("couldn't create renderer")
-
 when true: # behaviors again
   proc init(game: Game) =
     init(game, game.state, game.global)
 
-  proc finish*(game: Game) =
+  proc finish(game: Game) =
     finish(game, game.state, game.global)
 
   proc tick(game: Game) =
@@ -127,6 +103,31 @@ when true: # behaviors again
 
   proc keyReleased(game: Game, event: KeyboardEventPtr) =
     keyReleased(game, game.state, game.global, event)
+
+proc switch(game: Game, k: StateKind) =
+  finish(game)
+  game.state = State(kind: k)
+  init(game)
+
+proc newGame(): Game =
+  result = Game()
+  result.global = newGlobal()
+  when defined(js):
+    result.global.canvas = CanvasElement getElementById("fup1")
+    result.global.context = result.global.canvas.getContext2d()
+  else:
+    sdl2.init(INIT_VIDEO or INIT_TIMER or INIT_EVENTS or INIT_AUDIO)
+      .unwrap("couldn't initialize SDL")
+    setHint("SDL_RENDER_SCALE_QUALITY", "2")
+      .unwrap("couldn't set SDL render scale quality")
+
+    result.global.window = createWindow(
+      "The Tetry Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+      ReferenceWidth, ReferenceHeight, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
+      .unwrap("couldn't create window")
+    result.global.renderer = result.global.window.createRenderer(-1,
+      Renderer_Accelerated or Renderer_PresentVsync)
+      .unwrap("couldn't create renderer")
 
 when defined(js):
   proc addListeners(game: Game) =
@@ -222,7 +223,7 @@ proc mainLoop(game: Game) {.async.} =
 
 proc main() =
   var game = newGame()
-  init(game)
+  switch(game, gsInitial)
   when defined(js):
     discard mainLoop(game)
 

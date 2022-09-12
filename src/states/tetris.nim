@@ -136,6 +136,8 @@ proc spawnPiece(state: Tetris, initial = nextPiece(state)) =
     state.piece.pos = Coord(state.piece.pos.int - Columns)
   state.pieceDropTick = 0
 
+from os import fileExists
+
 proc init*(state: var Tetris, global: Global) =
   state = Tetris()
   block pieceDrop:
@@ -151,7 +153,9 @@ proc init*(state: var Tetris, global: Global) =
   for np in state.nextPieces.mitems:
     np = initPiece(state.randPieceKind)
   spawnPiece(state)
-  setMusic(global.currentMusic, "assets/music.ogg")
+  # js will only fail in console
+  if (when defined(js): true else: fileExists("assets/music.ogg")):
+    setMusic(global.currentMusic, "assets/music.ogg")
   loopMusic(global.currentMusic)
 
 proc finish*(state: Tetris, global: Global) =
