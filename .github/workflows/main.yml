@@ -1,0 +1,43 @@
+name: build browser
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: jiro4989/setup-nim-action@v1
+
+      - name: compile to JS
+        run: |
+          nimble install -y
+          nimble browser
+      
+      - name: move to subfolder
+        run: |
+          mkdir pages
+          mv assets pages/
+          mv browser.html pages/
+          mv fup1.js pages/
+          cd pages
+          git init
+          git add -A
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -m 'deploy'
+      
+      - name: push to branch
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          force: true
+          directory: ./pages/
