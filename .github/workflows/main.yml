@@ -1,4 +1,4 @@
-name: build browser
+name: fup1
 
 on:
   push:
@@ -16,10 +16,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: jiro4989/setup-nim-action@v1
 
+      - name: install dependencies
+        run: nimble install -y
+
       - name: compile to JS
-        run: |
-          nimble install -y
-          nimble browser
+        run: nimble browser
       
       - name: move to subfolder
         run: |
