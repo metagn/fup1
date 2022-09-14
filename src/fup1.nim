@@ -90,7 +90,7 @@ when true: # behaviors again
     when canvasBackend:
       let windowWidth = cint game.global.canvas.width
       let windowHeight = cint game.global.canvas.height
-    when sdlBackend:
+    elif sdlBackend:
       let windowSize = game.global.window.getSize()
       let (windowWidth, windowHeight) = windowSize
     render(game, game.state, game.global, windowWidth, windowHeight)
@@ -117,7 +117,7 @@ proc init(game: var Game) =
     game.global.canvas = CanvasElement getElementById("fup1")
     game.global.context = game.global.canvas.getContext2d()
 
-  when sdlBackend:
+  elif sdlBackend:
     sdl2.init(INIT_VIDEO or INIT_TIMER or INIT_EVENTS or INIT_AUDIO)
       .unwrap("couldn't initialize SDL")
     setHint("SDL_RENDER_SCALE_QUALITY", "2")
@@ -152,7 +152,7 @@ when canvasBackend:
     let window {.importc.}: Window
     game.global.canvas.width = window.innerWidth
     game.global.canvas.height = window.innerHeight
-when sdlBackend:
+elif sdlBackend:
   proc listen(game: Game) =
     var event = defaultEvent
     while event.pollEvent():

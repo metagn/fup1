@@ -63,7 +63,7 @@ proc preRender*(global: Global) =
   drawColor(0, 0, 0)
   when canvasBackend:
     global.context.clearRect(0, 0, global.canvas.width, global.canvas.height)
-  when sdlBackend:
+  elif sdlBackend:
     global.renderer.clear()
 
 proc postRender*(global: Global) =
