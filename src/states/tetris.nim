@@ -444,12 +444,3 @@ proc keyReleased*(state: Tetris, global: Global, event: KeyboardEventPtr) =
     state.pieceDropTime = 120
     state.pieceDropRetries = 1
   else: discard
-
-when false:
-  windowResize:
-    let (width, height) = window.getSize
-    let a = width / ReferenceWidth
-    let b = height / ReferenceHeight
-    if a != b:
-      let min = min(a, b)
-      window.setSize cint round min * ReferenceWidth, cint round min * ReferenceHeight

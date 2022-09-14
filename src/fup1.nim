@@ -87,10 +87,10 @@ when true: # behaviors again
     tick(game, game.state, game.global)
 
   proc render(game: Game) =
-    when defined(js):
+    when canvasBackend:
       let windowWidth = cint game.global.canvas.width
       let windowHeight = cint game.global.canvas.height
-    else:
+    when sdlBackend:
       let windowSize = game.global.window.getSize()
       let (windowWidth, windowHeight) = windowSize
     render(game, game.state, game.global, windowWidth, windowHeight)
@@ -109,27 +109,38 @@ proc switch(game: Game, k: StateKind) =
   game.state = State(kind: k)
   init(game)
 
-proc newGame(): Game =
-  result = Game()
-  result.global = newGlobal()
-  when defined(js):
-    result.global.canvas = CanvasElement getElementById("fup1")
-    result.global.context = result.global.canvas.getContext2d()
-  else:
+proc init(game: var Game) =
+  game = Game()
+  game.global = newGlobal()
+
+  when canvasBackend:
+    game.global.canvas = CanvasElement getElementById("fup1")
+    game.global.context = game.global.canvas.getContext2d()
+
+  when sdlBackend:
     sdl2.init(INIT_VIDEO or INIT_TIMER or INIT_EVENTS or INIT_AUDIO)
       .unwrap("couldn't initialize SDL")
     setHint("SDL_RENDER_SCALE_QUALITY", "2")
       .unwrap("couldn't set SDL render scale quality")
 
-    result.global.window = createWindow(
+    game.global.window = createWindow(
       "The Tetry Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
       ReferenceWidth, ReferenceHeight, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE or SDL_WINDOW_OPENGL)
       .unwrap("couldn't create window")
-    result.global.renderer = result.global.window.createRenderer(-1,
+    game.global.renderer = game.global.window.createRenderer(-1,
       Renderer_Accelerated or Renderer_PresentVsync)
       .unwrap("couldn't create renderer")
+    
+    discard openAudio(44100, 0, 2, 4096)
+  
+  switch(game, gsInitial)
 
-when defined(js):
+proc finish(game: var Game) =
+  when sdlBackend:
+    closeAudio()
+    sdl2.quit()
+
+when canvasBackend:
   proc addListeners(game: Game) =
     document.body.addEventListener("keydown", proc (ev: Event) =
       let k = KeyboardEvent ev
@@ -138,18 +149,10 @@ when defined(js):
       keyRepeat(game, k))
     document.body.addEventListener("keyup", proc (ev: Event) =
       keyReleased(game, ev.KeyboardEvent))
-    when false:
-      document.body.addEventListener("mousedown", proc (ev: Event) =
-        mouse(game, ev.MouseEvent))
     let window {.importc.}: Window
     game.global.canvas.width = window.innerWidth
     game.global.canvas.height = window.innerHeight
-    when false:
-      window.addEventListener("resize", proc (ev: Event) =
-        game.global.canvas.width = window.innerWidth
-        game.global.canvas.height = window.innerHeight
-        windowResize(game, UIEvent ev))
-else:
+when sdlBackend:
   proc listen(game: Game) =
     var event = defaultEvent
     while event.pollEvent():
@@ -163,29 +166,7 @@ else:
         keyRepeat(game, key)
       of KeyUp:
         keyReleased(game, event.key)
-      of MouseButtonDown:
-        when false:
-          mouse(game, event.button)
-      of WindowEvent:
-        when false:
-          let win = event.window
-          if win.event == WindowEvent_Resized:
-            windowResize(game, win)
       else: discard
-
-when defined(js):
-  {.emit: """
-window.requestAnimationFrame =
-  window.requestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    ((cb) => window.setTimeout(callback, 1000 / 60));
-""".}
-  import asyncjs
-else:
-  import std/monotimes
-  from std/os import sleep
-  {.pragma: async.}
 
 from states/common import preRender, postRender
 
@@ -196,14 +177,31 @@ proc singleLoop(game: Game) =
   postRender(game.global)
   inc game.global.numTicks
 
-proc mainLoop(game: Game) {.async.} =
-  when not defined(js):
-    discard openAudio(44100, 0, 2, 4096)
+when defined(js):
+  import asyncjs
 
-    defer:
-      closeAudio()
-      sdl2.quit()
+  # requestAnimationFrame polyfill:
+  {.emit: """
+window.requestAnimationFrame =
+  window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    ((cb) => window.setTimeout(callback, 1000 / 60));
+""".}
 
+  proc mainLoop(game: Game) {.async, discardable.} =
+    addListeners(game)
+    var lastTimestamp: float
+    proc frame(timestamp: float) =
+      game.global.fps = int(1000 / (timestamp - lastTimestamp))
+      singleLoop(game)
+      lastTimestamp = timestamp
+      discard window.requestAnimationFrame(frame)
+    discard window.requestAnimationFrame(frame)
+else:
+  import std/monotimes
+  from std/os import sleep
+  proc mainLoop(game: Game) =
     var lastFrameTime: MonoTime
     while (lastFrameTime = getMonoTime(); game.state.kind != gsDone):
       listen(game)
@@ -211,30 +209,14 @@ proc mainLoop(game: Game) {.async.} =
       let sleepTime = int((nanowait - getMonoTime().ticks + lastFrameTime.ticks) div 1_000_000)
       if sleepTime >= 0: sleep(sleepTime)
       singleLoop(game)
-  else:
-    var lastTimestamp: float
-    addListeners(game)
-    proc foo(timestamp: float) =
-      game.global.fps = int(1000 / (timestamp - lastTimestamp))
-      singleLoop(game)
-      lastTimestamp = timestamp
-      discard window.requestAnimationFrame(foo)
-    discard window.requestAnimationFrame(foo)
 
 proc main() =
-  var game = newGame()
-  switch(game, gsInitial)
-  when defined(js):
-    discard mainLoop(game)
+  var game: Game
 
-    when false:
-      import jsconsole
-      var lastNumTicks: int
-      discard window.setInterval(proc () =
-        console.log(numTicks - lastNumTicks)
-        lastNumTicks = numTicks, 1000)
-  else:
-    mainLoop(game)
+  init(game)
+  defer: finish(game)
+
+  mainLoop(game)
 
 when isMainModule:
   main()

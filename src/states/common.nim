@@ -61,11 +61,11 @@ elif sdlBackend:
 
 proc preRender*(global: Global) =
   drawColor(0, 0, 0)
-  when defined(js):
+  when canvasBackend:
     global.context.clearRect(0, 0, global.canvas.width, global.canvas.height)
-  else:
+  when sdlBackend:
     global.renderer.clear()
 
 proc postRender*(global: Global) =
-  when not defined(js):
+  when sdlBackend:
     global.renderer.present()

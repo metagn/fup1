@@ -21,7 +21,7 @@ type Global* = ref object
   when canvasBackend:
     canvas*: CanvasElement
     context*: CanvasContext
-  elif sdlBackend:
+  when sdlBackend:
     window*: WindowPtr
     renderer*: RendererPtr
 
