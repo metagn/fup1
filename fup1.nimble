@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.3"
+version       = "0.3.0"
 author        = "metagn"
 description   = "googoo"
 license       = "MIT"
@@ -11,6 +11,7 @@ bin           = @["fup1"]
 # Dependencies
 
 requires "nim >= 1.4.2"
+requires "sdl2"
 requires "https://github.com/metagn/sdlutils#head"
 requires "jscanvas"
 
